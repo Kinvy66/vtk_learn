@@ -12,4 +12,7 @@ endif()
 project ("VTK_Learn")
 
 # 包含子项目。
-add_subdirectory ("VTK_Hello")
+add_subdirectory (VTK_Hello)
+add_subdirectory(VTK_Pipeline)
+add_subdirectory(VTK_Visualization)
+add_subdirectory(VTK_Modeling)
