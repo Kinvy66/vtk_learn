@@ -51,6 +51,9 @@
 #include <vtkOutlineFilter.h>
 #include <vtkAppendPolyData.h>
 #include <vtkProbeFilter.h>
+#include <vtkImplicitModeller.h>
+#include <vtkRegularPolygonSource.h>
+#include <vtkWarpTo.h>
 
 VTKPlatform::VTKPlatform(QWidget *parent)
     : QMainWindow(parent)
@@ -76,12 +79,65 @@ VTKPlatform::VTKPlatform(QWidget *parent)
     profile->SetPoints(points);
     profile->SetLines(lines);
     
+    
+    vtkNew<vtkTubeFilter> tube;
+    tube->SetInputData(profile);
+    tube->SetRadius(.5);
+    tube->SetNumberOfSides(12);
+    
     vtkNew<vtkPolyDataMapper> mapper;
     vtkNew<vtkActor> actor;
     mapper->SetInputData(profile);
     actor->SetMapper(mapper);
     actor->GetProperty()->SetColor(75.0 / 255.0, 75.0 / 255.0, 75.0 / 255.0); // 设置边框颜色
     
+    vtkNew<vtkPolyDataMapper> tubeMapper;
+    vtkNew<vtkActor> tubeActor;
+    tubeMapper->SetInputConnection(tube->GetOutputPort());
+    tubeActor->SetMapper(tubeMapper);
+    
+    // implicit modeller
+    vtkNew<vtkImplicitModeller> imp;
+    imp->SetInputData(profile);
+    imp->SetSampleDimensions(100, 100, 100);
+    imp->SetMaximumDistance(0.25);
+    imp->SetModelBounds(-10, 10, -10, 10, -10, 10);
+    vtkNew<vtkContourFilter> contour;
+    contour->SetInputConnection(imp->GetOutputPort());
+    contour->SetValue(0, .5);
+    
+    vtkNew<vtkPolyDataMapper> impMapper;
+    vtkNew<vtkActor> impActor;
+    impMapper->SetInputConnection(contour->GetOutputPort());
+    impActor->SetMapper(impMapper);
+    impActor->SetPosition(5, 0, 0);
+    
+    // circle
+    vtkNew<vtkRegularPolygonSource> circle;
+    circle->GeneratePolygonOn();
+    circle->SetNumberOfSides(50);
+    circle->SetRadius(2);
+    circle->SetCenter(0, 0, 0);
+
+    vtkNew<vtkImplicitModeller> circleImp;
+    circleImp->SetInputConnection(circle->GetOutputPort());
+    circleImp->SetSampleDimensions(100, 100, 8);
+    circleImp->SetModelBounds(-3, 3, -3, 3, -.2, .2);
+    vtkNew<vtkContourFilter> circleCF;
+    circleCF->SetInputConnection(circleImp->GetOutputPort());
+    circleCF->SetValue(0, .2);
+    
+    vtkNew<vtkWarpTo> circleWT;
+    circleWT->SetInputConnection(circleCF->GetOutputPort());
+    circleWT->SetPosition(0, 0, 5);
+    circleWT->SetScaleFactor(0.85);
+    circleWT->AbsoluteOn();
+    
+    vtkNew<vtkPolyDataMapper> circleMapper;
+    vtkNew<vtkActor> circleActor;
+    circleMapper->SetInputConnection(circleWT->GetOutputPort());
+    circleActor->SetMapper(circleMapper);
+    circleActor->SetPosition(12, 0, 0);
     
     
     // renderer 
@@ -92,6 +148,9 @@ VTKPlatform::VTKPlatform(QWidget *parent)
     renderer->GradientBackgroundOn();
     
     renderer->AddActor(actor);
+    renderer->AddActor(tubeActor);
+    renderer->AddActor(impActor);
+    renderer->AddActor(circleActor);
     
     this->_pVTKWidget->renderWindow()->AddRenderer(renderer);
     this->_pVTKWidget->renderWindow()->Render();
